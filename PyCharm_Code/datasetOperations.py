@@ -18,7 +18,7 @@ import os
 import cv2
 import random
 
-covid_files_path = 'CT_Scans/CNN_COVID_19/'
+covid_files_path = 'PyCharm_Code/CT_Scans'
 covid_files      = [os.path.join(covid_files_path, x) for x in os.listdir(covid_files_path)]
 covid_images    =  [cv2.imread(x) for x in random.sample(covid_files, 5)]
 
