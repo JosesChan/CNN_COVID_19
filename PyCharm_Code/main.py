@@ -51,8 +51,11 @@ non_covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCh
 covidPatients = os.listdir(covid_files_path)
 nonCovidPatients = os.listdir(non_covid_files_path)
 
+covidNegativeDf = pandas.DataFrame(nonCovidPatients)
+covidNegativeDf.insert(1, "label", 1, True)
+print(covidNegativeDf.head())
 covidPositiveDf = pandas.DataFrame(covidPatients)
-
+covidPositiveDf.insert(1, "label", 1, True)
 print(covidPositiveDf.head())
 print("End")
 
