@@ -40,8 +40,8 @@ random.seed(0)
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 # file locations
-covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCharm_Code\\CT_Scans\\Covid_Positive'
-non_covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCharm_Code\\CT_Scans\\Covid_Negative'
+covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCharm_Code\\CT_Scans\\Covid_Positive\\'
+non_covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCharm_Code\\CT_Scans\\Covid_Negative\\'
 
 # Read in covid and non covid file locations
 # covid_files      = [os.path.join(covid_files_path, x) for x in os.listdir(covid_files_path)]
@@ -50,25 +50,37 @@ non_covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCh
 # non_covid_images    =  [cv2.imread(x) for x in random.sample(non_covid_files, displaySampleSize)]
 covidPatients = os.listdir(covid_files_path)
 nonCovidPatients = os.listdir(non_covid_files_path)
+patientsSum = covidPatients + nonCovidPatients
 
 covidPositiveDf = pandas.DataFrame(covidPatients)
 covidPositiveDf.insert(1, "label", 1, True)
 print(covidPositiveDf.head())
-print("End")
 
 covidNegativeDf = pandas.DataFrame(nonCovidPatients)
 covidNegativeDf.insert(1, "label", 0, True)
 print(covidNegativeDf.head())
-print("End")
 
-# for i in covidPatients[:1]:
-#      label = covidPositiveDf.get
+patientDf = pandas.concat([covidPositiveDf,covidNegativeDf])
+patientDf = patientDf.astype({'label':'int'})
+print(patientDf.head())
 
-# # read in slices
-# slices = [pydicom.read_file(non_covid_files_path+"/"+s) for s in os.listdir(non_covid_files_path)]
-# # sort slices by their image position in comparison to other slices
-# slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
-# print(len(slices),label)
+print("Total Patient Count")
+print(len(patientDf))
+
+for index, i in patientDf.iterrows():
+    label = i["label"]
+
+    if(label==1):
+        path = covid_files_path + patientDf.iat[index,0]
+
+    if(label==0):
+        path = non_covid_files_path + patientDf.iat[index,0]
+
+    # read in slices
+    slices = [pydicom.read_file(path+"/"+s) for s in os.listdir(path)]
+    # sort slices by their image position in comparison to other slices
+    slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
+    print(len(slices), slices[0])
 
 class NeuralNetwork(nn.Module):
     def __init__(self):
