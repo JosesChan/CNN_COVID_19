@@ -51,86 +51,83 @@ non_covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCh
 covidPatients = os.listdir(covid_files_path)
 nonCovidPatients = os.listdir(non_covid_files_path)
 
-covidNegativeDf = pandas.DataFrame(nonCovidPatients)
-covidNegativeDf.insert(1, "label", 1, True)
-print(covidNegativeDf.head())
 covidPositiveDf = pandas.DataFrame(covidPatients)
 covidPositiveDf.insert(1, "label", 1, True)
 print(covidPositiveDf.head())
 print("End")
 
-# for x in os.listdir(covid_files_path):
-#     label = covidPositiveDf
+covidNegativeDf = pandas.DataFrame(nonCovidPatients)
+covidNegativeDf.insert(1, "label", 0, True)
+print(covidNegativeDf.head())
+print("End")
 
-# def load_dicom(filePath):
-#     dicom = pydicom.dcmread(filePath)
-#     # TODO: adjust spacing in particular dimension according DICOM meta
-#     try:
-#         img = pydicom.apply_voi_lut(dicom.pixel_array, dicom).astype(np.float32)
-#     except RuntimeError as err:
-#         print(err)
-#         return None
-#     return img
+# for i in covidPatients[:1]:
+#      label = covidPositiveDf.get
 
-# def load_volume(filePath: str, percentile):
-#     path_slices = glob.glob(os.path.join(filePath, '*.dcm'))
-#     path_slices = sorted(path_slices, key=parse_name_index)
-#     vol = []
-#     for p_slice in path_slices:
-#         img = load_dicom(p_slice)
-#         if img is None:
-#             continue
-#         vol.append(img.T)
-#     volume = torch.tensor(vol, dtype=torch.float32)
-#     if percentile is not None:
-#         # get extreme values
-#         p_low = np.quantile(volume, percentile) if percentile else volume.min()
-#         p_high = np.quantile(volume, 1 - percentile) if percentile else volume.max()
-#         # normalize
-#         volume = (volume - p_low) / (p_high - p_low)
-#     return volume.T
+# # read in slices
+# slices = [pydicom.read_file(non_covid_files_path+"/"+s) for s in os.listdir(non_covid_files_path)]
+# # sort slices by their image position in comparison to other slices
+# slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
+# print(len(slices),label)
 
-# # match index names with 
-# def parse_name_index(dcm_path) -> int:
-#     res = re.match(r".*-(\d+)\.dcm", dcm_path).groups()
-#     assert len(res) == 1
-#     return int(res[0])
+class NeuralNetwork(nn.Module):
+    def __init__(self):
+        super(NeuralNetwork, self).__init__()
+        self.flatten = nn.Flatten()
+        
+        self.sequentialLayers = nn.Sequential(
+            nn.Linear(28*28, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 10),
+        )
 
-# path_slices = sorted(path_slices, key=parse_name_index)
-# vol = [load_dicom]
-# volume = torch.tensor(vol, dtype=torch.float32)
+    #     self.sequentialLayers = nn.Sequential(
+    #     # Convolution and Pooling layer
+    #     nn.Conv3d(),
+    #     nn.MaxPool3d(),
+    #     nn.BatchNorm3d(),
+    #     nn.Conv3d(),
+    #     nn.MaxPool3d(),
+    #     nn.BatchNorm3d(),
+    #     nn.Conv3d(),
+    #     nn.MaxPool3d(),
+    #     nn.BatchNorm3d(),
+    #     nn.Conv3d(),
+    #     nn.MaxPool3d(),
+    #     nn.BatchNorm3d(),
+    #     nn.Conv3d(),
+    #     nn.MaxPool3d(),
+    #     nn.BatchNorm3d(),
+    #     nn.Flatten(),
+    #     #Full connected layer
+    #     nn.ReLU(),
+    #     nn.Dropout3d,
+    #     nn.ReLU(),
+    #     nn.Dropout3d
+    #    ) 
 
-# def neuralNet3D():
+    # feed foward function
+    def forward(self, x):
+        # flatten for input layer
+        x = self.flatten(x)
+        # create non normalised predictions
+        logits = self.sequentialLayers(x)
+        # return non normalised predictions
+        return logits
 
-#     inputLayer = (128,128,128,64)
+# model = NeuralNetwork().to(device)
+# print(model)
 
-#     seqModules = nn.Sequential(
-#         # Convolution and Pooling layer
-#         nn.Conv3d(),
-#         nn.MaxPool3d(),
-#         nn.BatchNorm3d(),
-#         nn.Conv3d(),
-#         nn.MaxPool3d(),
-#         nn.BatchNorm3d(),
-#         nn.Conv3d(),
-#         nn.MaxPool3d(),
-#         nn.BatchNorm3d(),
-#         nn.Conv3d(),
-#         nn.MaxPool3d(),
-#         nn.BatchNorm3d(),
-#         nn.Conv3d(),
-#         nn.MaxPool3d(),
-#         nn.BatchNorm3d(),
-#         nn.Flatten(),
-#         #Full connected layer
-#         nn.ReLU(),
-#         nn.Dropout3d,
-#         nn.ReLU(),
-#         nn.Dropout3d,
-#         nn.Softmax
-#     ) 
+# print(f"Model structure: {model}\n\n")
 
-#     seqModules(inputLayer)
+# for name, param in model.named_parameters():
+#     print(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
+
+
+
+
 
 
 # for patient in patients[:1]:
