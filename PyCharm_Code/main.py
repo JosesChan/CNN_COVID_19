@@ -33,6 +33,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from pydicom.pixel_data_handlers import apply_voi_lut
 from torchvision.models import vgg19_bn
+from scipy.ndimage import zoom
 
 #define parameters
 displaySampleSize = 2
@@ -71,7 +72,7 @@ print("Total Patient Count")
 print(len(patientDf))
 
        
-# Source Code for resizer, SSS and SIZ
+# Source Code for resizer and SIZ
 #https://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynb
 
 # Resize 2D slices
@@ -80,19 +81,6 @@ def rs_img(img):
     img = np.transpose(img)
     flatten = [cv2.resize(img[:,:,i], (512, 512), interpolation=cv2.INTER_CUBIC) for i in range(img.shape[-1])]
     img = np.array(np.dstack(flatten)) 
-    return img
-
-# Subset slice selection (SSS)
-def change_depth_sss(img):
-    
-    factor = 16
-    img_start = img[:,:,:factor]
-    
-    mid = int(img.shape[-1]/2)
-    img_middle = img[:,:,mid-factor:mid+factor]
-    
-    img_end = img[:,:,-factor:]
-    img = np.concatenate((img_start, img_middle, img_end), axis=2)
     return img
 
 # Spline interpolated zoom (SIZ)
@@ -104,6 +92,8 @@ def change_depth_siz(img):
     img_new = zoom(img, (1, 1, depth_factor), mode='nearest')
     return img_new
 
+depthsList = []
+sumImageSlice = []
 
 for index, i in patientDf.iterrows():
     label = i["label"]
@@ -116,12 +106,28 @@ for index, i in patientDf.iterrows():
 
     # read in slices
     slices = [pydicom.read_file(path+"/"+s) for s in os.listdir(path)]
-    # sort slices by their image position in comparison to other slices
+    # sort slices by their image position in comparison to other slices 
     slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
     print(len(slices), slices[0].Rows, slices[0].Columns)
+    
+    # collect CT scan data as a pixel array
     imageSlice = slices[0].pixel_array
     imageSlice = rs_img(imageSlice)
+
+    # get the indiviual depth values of each CT scan
+    depthValue = imageSlice.shape[-1]
+    depthsList.append(depthValue)
+
+    # Apply sampling technique
+    imageSlice = change_depth_siz(imageSlice)
+
     print("Raw Pixel Volume Size: ", imageSlice)
+
+    sumImageSlice.append(imageSlice)
+    imageSlice=None
+
+trainingData = np.array(sumImageSlice)
+print(trainingData.shape)
  
 class NeuralNetwork(nn.Module):
     def __init__(self):
