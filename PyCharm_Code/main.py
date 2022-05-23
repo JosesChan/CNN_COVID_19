@@ -10,6 +10,9 @@
 # Interesting notes:
 # How much CT scans are there of healthy patients without any diseases? Does this limit effectiveness?
 
+#Dicom compressed image workaround providedd by:
+#https://github.com/pydicom/pylibjpeg
+
 from tkinter.ttk import LabeledScale
 import torch
 import torchvision
@@ -67,6 +70,41 @@ print(patientDf.head())
 print("Total Patient Count")
 print(len(patientDf))
 
+       
+# Source Code for resizer, SSS and SIZ
+#https://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynb
+
+# Resize 2D slices
+def rs_img(img):
+    # Transpose
+    img = np.transpose(img)
+    flatten = [cv2.resize(img[:,:,i], (512, 512), interpolation=cv2.INTER_CUBIC) for i in range(img.shape[-1])]
+    img = np.array(np.dstack(flatten)) 
+    return img
+
+# Subset slice selection (SSS)
+def change_depth_sss(img):
+    
+    factor = 16
+    img_start = img[:,:,:factor]
+    
+    mid = int(img.shape[-1]/2)
+    img_middle = img[:,:,mid-factor:mid+factor]
+    
+    img_end = img[:,:,-factor:]
+    img = np.concatenate((img_start, img_middle, img_end), axis=2)
+    return img
+
+# Spline interpolated zoom (SIZ)
+def change_depth_siz(img):
+    desired_depth = 64
+    current_depth = img.shape[-1]
+    depth = current_depth / desired_depth
+    depth_factor = 1 / depth
+    img_new = zoom(img, (1, 1, depth_factor), mode='nearest')
+    return img_new
+
+
 for index, i in patientDf.iterrows():
     label = i["label"]
 
@@ -80,8 +118,11 @@ for index, i in patientDf.iterrows():
     slices = [pydicom.read_file(path+"/"+s) for s in os.listdir(path)]
     # sort slices by their image position in comparison to other slices
     slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
-    print(len(slices), slices[0])
-
+    print(len(slices), slices[0].Rows, slices[0].Columns)
+    imageSlice = slices[0].pixel_array
+    imageSlice = rs_img(imageSlice)
+    print("Raw Pixel Volume Size: ", imageSlice)
+ 
 class NeuralNetwork(nn.Module):
     def __init__(self):
         super(NeuralNetwork, self).__init__()
