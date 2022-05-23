@@ -34,6 +34,8 @@ from torchvision import datasets, transforms
 from pydicom.pixel_data_handlers import apply_voi_lut
 from torchvision.models import vgg19_bn
 from scipy.ndimage import zoom
+from sklearn.model_selection import train_test_split
+
 
 #define parameters
 displaySampleSize = 2
@@ -68,7 +70,7 @@ patientDf = pandas.concat([covidPositiveDf,covidNegativeDf])
 patientDf = patientDf.astype({'label':'int'})
 print(patientDf.head())
 
-chosenDf = patientDf.head(3)
+chosenDf = patientDf.head(5)
 
 print("Total Patient Count")
 print(len(chosenDf))
@@ -84,16 +86,17 @@ def rs_img(img):
 
 # Spline interpolated zoom (SIZ)
 def change_depth_siz(img):
-    desired_depth = 64
-    current_depth = img.shape[-1]
+    desired_depth = 128
+    current_depth = img.shape[0]
     print("Current Depth: ", current_depth)
     depth = current_depth / desired_depth
     depth_factor = 1 / depth
-    img_new = zoom(img, (1, 1, depth_factor), mode='nearest')
-    print("New Depth", img.shape[-1])
+    img_new = zoom(img, (depth_factor, 1, 1), mode='nearest')
+    print("New Depth", img_new.shape[0])
+    print(img_new.shape)
     return img_new
 
-
+processedCTScans = []
 for index, i in chosenDf.iterrows():
     label = i["label"]
     imageSlice = []
@@ -117,13 +120,13 @@ for index, i in chosenDf.iterrows():
 
     # Apply sampling technique
     imageSlice = change_depth_siz(np.asanyarray(imageSlice))
+    processedCTScans.append(imageSlice)
 
-    print("Raw Pixel Volume Size: ", imageSlice)
-
+    plt.imshow(imageSlice[0])
+    plt.show()
     imageSlice=None
 
-trainingData = np.array()
-print(trainingData.shape)
+print((np.asanyarray(processedCTScans)).shape)
  
 class NeuralNetwork(nn.Module):
     def __init__(self):
@@ -180,61 +183,12 @@ class NeuralNetwork(nn.Module):
 # for name, param in model.named_parameters():
 #     print(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
 
+model = NeuralNetwork().to(device)
+print(model)
+
+logits = model(processedCTScans)
+pred_probab = nn.Softmax(dim=1)(logits)
+y_pred = pred_probab.argmax(1)
+print(f"Predicted class: {y_pred}")
 
 
-
-
-
-# batch_size = 4
-
-# # prepare training data
-# trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-# trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
-
-# # prepare testing data
-# testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-# testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
-
-# classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
-
-# class CovidCTDataset(torch.utils.data.Dataset):
-#     # Intialisation variables and 
-#     def __init__(self, root_dir, classes, covid_files, non_covid_files, transform=None):
-#         self.root_dir = root_dir
-#         self.classes = classes
-#         self.files_path = [non_covid_files, covid_files]
-#         self.image_list = []
-
-#         # read the files from data split text files
-#         covid_files = read_txt(covid_files)
-#         non_covid_files = read_txt(non_covid_files)
-
-#         # combine the positive and negative files into a cummulative files list
-#         for cls_index in range(len(self.classes)):
-            
-#             class_files = [[os.path.join(self.root_dir, self.classes[cls_index], x), cls_index] \
-#                             for x in read_txt(self.files_path[cls_index])]
-#             self.image_list += class_files
-                
-#         self.transform = transform
-#     def __len__(self):
-#         return len(self.image_list)
-
-#     def __getitem__(self, idx):
-#         path = self.image_list[idx][0]
-        
-#         # Read the image
-#         image = Image.open(path).convert('RGB')
-        
-#         # Apply transforms
-#         if self.transform:
-#             image = self.transform(image)
-
-#         label = int(self.image_list[idx][1])
-
-#         data = {'img':   image,
-#                 'label': label,
-#                 'paths' : path}
-
-#         return data
