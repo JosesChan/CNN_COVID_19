@@ -68,41 +68,41 @@ patientDf = pandas.concat([covidPositiveDf,covidNegativeDf])
 patientDf = patientDf.astype({'label':'int'})
 print(patientDf.head())
 
+chosenDf = patientDf.head(3)
+
 print("Total Patient Count")
-print(len(patientDf))
+print(len(chosenDf))
 
        
 # Source Code for resizer and SIZ
 #https://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynb
 
-# Resize 2D slices
+# Resize 2D slices using bicubic interpolation to common CT size
 def rs_img(img):
-    # Transpose
-    img = np.transpose(img)
-    flatten = [cv2.resize(img[:,:,i], (512, 512), interpolation=cv2.INTER_CUBIC) for i in range(img.shape[-1])]
-    img = np.array(np.dstack(flatten)) 
+    img = cv2.resize(img, (512, 512), interpolation=cv2.INTER_CUBIC)
     return img
 
 # Spline interpolated zoom (SIZ)
 def change_depth_siz(img):
     desired_depth = 64
     current_depth = img.shape[-1]
+    print("Current Depth: ", current_depth)
     depth = current_depth / desired_depth
     depth_factor = 1 / depth
     img_new = zoom(img, (1, 1, depth_factor), mode='nearest')
+    print("New Depth", img.shape[-1])
     return img_new
 
-depthsList = []
-sumImageSlice = []
 
-for index, i in patientDf.iterrows():
+for index, i in chosenDf.iterrows():
     label = i["label"]
+    imageSlice = []
 
     if(label==1):
-        path = covid_files_path + patientDf.iat[index,0]
+        path = covid_files_path + chosenDf.iat[index,0]
 
     if(label==0):
-        path = non_covid_files_path + patientDf.iat[index,0]
+        path = non_covid_files_path + chosenDf.iat[index,0]
 
     # read in slices
     slices = [pydicom.read_file(path+"/"+s) for s in os.listdir(path)]
@@ -110,23 +110,19 @@ for index, i in patientDf.iterrows():
     slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
     print(len(slices), slices[0].Rows, slices[0].Columns)
     
-    # collect CT scan data as a pixel array
-    imageSlice = slices[0].pixel_array
-    imageSlice = rs_img(imageSlice)
-
-    # get the indiviual depth values of each CT scan
-    depthValue = imageSlice.shape[-1]
-    depthsList.append(depthValue)
+    # collect CT scan data as a pixel array, resize then store
+    for i in range(len(slices)):
+        imageSlice.append(rs_img(slices[i].pixel_array))
+    print("Resize x and y complete")
 
     # Apply sampling technique
-    imageSlice = change_depth_siz(imageSlice)
+    imageSlice = change_depth_siz(np.asanyarray(imageSlice))
 
     print("Raw Pixel Volume Size: ", imageSlice)
 
-    sumImageSlice.append(imageSlice)
     imageSlice=None
 
-trainingData = np.array(sumImageSlice)
+trainingData = np.array()
 print(trainingData.shape)
  
 class NeuralNetwork(nn.Module):
@@ -187,32 +183,6 @@ class NeuralNetwork(nn.Module):
 
 
 
-
-
-# for patient in patients[:1]:
-#     label = labels_df.get_value(patient, 'cancer')
-#     path = data_dir + patient
-#     slices = [pydicom.read_file(path + '/' + s) for s in os.listdir(path)]
-#     slices.sort(key = lambda x: int(x.ImagePositionPatient[2]
-
-# # Display ct covid positive
-# plt.figure(figsize=(20,10))
-# for i, image in enumerate(covid_images):
-#     plt.subplot(len(covid_images) / displaySampleSize + 1, displaySampleSize, i + 1)
-#     plt.imshow(image)
-#     plt.show()
-# print("Check if cuda is available")
-# print(torch.cuda.is_available())
-
-
-# # Display ct covid negative
-# plt.figure(figsize=(20,10))
-# for i, image in enumerate(non_covid_images):
-#     plt.subplot(len(non_covid_images) / displaySampleSize + 1, displaySampleSize, i + 1)
-#     plt.imshow(image)
-#     plt.show()
-
-# transform = transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
 
 # batch_size = 4
