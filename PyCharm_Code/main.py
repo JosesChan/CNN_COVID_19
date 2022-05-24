@@ -36,7 +36,6 @@ from scipy.ndimage import zoom
 from torch.autograd import Variable
 from tqdm.auto import tqdm
 from sklearn.metrics import classification_report, roc_auc_score, roc_curve, confusion_matrix
-from torch.utils.tensorboard import SummaryWriter
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -45,10 +44,6 @@ covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCharm_
 non_covid_files_path = 'C:\\Users\\Shadow\\Documents\\GitHub\\CNN_COVID_19\\PyCharm_Code\\CT_Scans\\Covid_Negative\\'
 
 # Read in covid and non covid file locations
-# covid_files      = [os.path.join(covid_files_path, x) for x in os.listdir(covid_files_path)]
-# covid_images    =  [cv2.imread(x) for x in random.sample(covid_files, displaySampleSize)]
-# non_covid_files      = [os.path.join(non_covid_files_path, x) for x in os.listdir(non_covid_files_path)]
-# non_covid_images    =  [cv2.imread(x) for x in random.sample(non_covid_files, displaySampleSize)]
 covidPatients = os.listdir(covid_files_path)
 nonCovidPatients = os.listdir(non_covid_files_path)
 patientsSum = covidPatients + nonCovidPatients
@@ -61,13 +56,13 @@ covidNegativeDf = pandas.DataFrame(nonCovidPatients)
 covidNegativeDf.insert(1, "label", 0, True)
 print(covidNegativeDf.head())
 
-patientDf = pandas.concat([covidPositiveDf,covidNegativeDf])
+patientDf = pandas.concat([covidPositiveDf.head(5),covidNegativeDf.head(5)])
 patientDf = patientDf.astype({'label':'int'})
-print(patientDf.head())
+print(patientDf.head(10))
 
-chosenDf = patientDf.head(5)
-chosenDf.insert(2, "img", allow_duplicates=True)
-chosenDf.insert(3, "prediction", None, allow_duplicates=True)
+chosenDf = patientDf.head(10)
+chosenDf.insert(2, "prediction", None, allow_duplicates=True)
+chosenDf.insert(3, "dataID", None, allow_duplicates=False)
 print("Total Patient Count")
 print(len(chosenDf))
 
@@ -93,16 +88,21 @@ def change_depth_siz(img):
     return img_new
 
 processedCTScans = []
-for index, i in chosenDf.iterrows():
+for i in range(len(chosenDf)):
     print("Index location: ", i)
-    label = i["label"]
+    chosenDf.iat[i, 3]
+    label = None
+    label = chosenDf.iat[i, 1]
     imageSlice = []
-
-    if(label==1):
-        path = covid_files_path + chosenDf.iat[index,0]
+    path = ""
 
     if(label==0):
-        path = non_covid_files_path + chosenDf.iat[index,0]
+        path = non_covid_files_path + chosenDf.iat[i,0]
+
+    if(label==1):
+        path = covid_files_path + chosenDf.iat[i,0]
+
+    print(path)
 
     # read in slices
     slices = [pydicom.read_file(path+"/"+s) for s in os.listdir(path)]
@@ -118,9 +118,8 @@ for index, i in chosenDf.iterrows():
     # Apply sampling technique
     imageSlice = change_depth_siz(np.asanyarray(imageSlice))
     processedCTScans.append(imageSlice)
-    chosenDf.iat[index,2] = imageSlice
-    plt.imshow(imageSlice[0])
-    plt.show()
+    # plt.imshow(imageSlice[0])
+    # plt.show()
     imageSlice=None
 
 print((np.asanyarray(processedCTScans)).shape)
@@ -131,7 +130,7 @@ class cnnNeuralNet(nn.Module):
         
         self.sequentialLayers = nn.Sequential(
         # Convolution and Pooling Layer 1
-        nn.Conv3d(out_channels = 64,kernel_size = (3,3,3)),
+        nn.Conv3d(in_channels = 3, out_channels = 64,kernel_size = (3,3,3)),
         nn.MaxPool3d(kernel_size=(2, 2, 2)),
         nn.BatchNorm3d(),
 
@@ -169,19 +168,11 @@ class cnnNeuralNet(nn.Module):
         out = self.Model(x)
         return out
 
-    def Accuracyfunction (Predicted, Targets):          
-        count=0
-        for i in range(len(Targets)):
-            if (Predicted[i] == Targets[i]):
-                count+=1
-        Accuracy =  count / float(len(Targets))
-        print('Accuracy   = ', count ,'/', len(Targets))
-        return(Accuracy)
 
 batchSize = 64
 epochs = 60
 
-trainingDf, testingDf = torch.utils.data.random_split(chosenDf, [7,3],torch.Generator().manual_seed(42))
+trainingDf, testingDf = torch.utils.data.random_split(chosenDf,[7,3],torch.Generator().manual_seed(42))
 
 trainLoader = torch.utils.data.DataLoader(trainingDf, batch_size = batchSize, drop_last=False, shuffle = False)
 testLoader = torch.utils.data.DataLoader(testingDf, batch_size = batchSize, drop_last=False, shuffle = False)
@@ -190,7 +181,6 @@ testLoader = torch.utils.data.DataLoader(testingDf, batch_size = batchSize, drop
 
 # Source code
 # https://blog.paperspace.com/fighting-coronavirus-with-ai-building-covid-19-classifier/
-
 
 def compute_metrics(model, test_loader, plot_roc_curve = False):
     
@@ -205,10 +195,10 @@ def compute_metrics(model, test_loader, plot_roc_curve = False):
     pred_list    = torch.Tensor([]).to(device).long()
     target_list  = torch.Tensor([]).to(device).long()
     path_list    = []
-
+    
     for index, i in test_loader.iterrows():
         # Convert image data into single channel data
-        image, target = i["img"], i['label'].to(device)
+        image, target = processedCTScans[i], i['label'].to(device)
 
         # Compute the loss
         with torch.no_grad():
@@ -226,11 +216,7 @@ def compute_metrics(model, test_loader, plot_roc_curve = False):
         pred_list    = torch.cat([pred_list, pred.squeeze()])
         target_list  = torch.cat([target_list, target.squeeze()])
         
-    
-    classification_metrics = classification_report(target_list.tolist(), pred_list.tolist(),
-                                                  target_names = ['CT_NonCOVID', 'CT_COVID'],
-                                                  output_dict= True)
-    
+    classification_metrics = classification_report(target_list.tolist(), pred_list.tolist(), target_names = ['CT_NonCOVID', 'CT_COVID'],output_dict= True)
     
     # sensitivity is the recall of the positive class
     sensitivity = classification_metrics['CT_COVID']['recall']
