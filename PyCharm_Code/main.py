@@ -36,6 +36,7 @@ from scipy.ndimage import zoom
 from torch.autograd import Variable
 from tqdm.auto import tqdm
 from sklearn.metrics import classification_report, roc_auc_score, roc_curve, confusion_matrix
+from sklearn.model_selection import train_test_split
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -87,47 +88,80 @@ def change_depth_siz(img):
     print(img_new.shape)
     return img_new
 
-processedCTScans = []
-for i in range(len(chosenDf)):
-    print("Index location: ", i)
-    chosenDf.iat[i, 3]
-    label = None
-    label = chosenDf.iat[i, 1]
-    imageSlice = []
-    path = ""
+yImages = []
+def loadProcessImage(dataset, processedCTScans):
+    for i in range(len(dataset)):
+        print("Index location: ", i)
+        dataset.iat[i, 3]
+        label = None
+        label = dataset.iat[i, 1]
+        imageSlice = []
+        path = ""
 
-    if(label==0):
-        path = non_covid_files_path + chosenDf.iat[i,0]
+        if(label==0):
+            path = non_covid_files_path + dataset.iat[i,0]
 
-    if(label==1):
-        path = covid_files_path + chosenDf.iat[i,0]
+        if(label==1):
+            path = covid_files_path + dataset.iat[i,0]
 
-    print(path)
+        print(path)
 
-    # read in slices
-    slices = [pydicom.read_file(path+"/"+s) for s in os.listdir(path)]
-    # sort slices by their image position in comparison to other slices 
-    slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
-    print(len(slices), slices[0].Rows, slices[0].Columns)
-    
-    # collect CT scan data as a pixel array, resize then store
-    for i in range(len(slices)):
-        imageSlice.append(rs_img(slices[i].pixel_array))
-    print("Resize x and y complete")
+        # read in slices
+        slices = [pydicom.read_file(path+"/"+s) for s in os.listdir(path)]
+        # sort slices by their image position in comparison to other slices 
+        slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
+        print(len(slices), slices[0].Rows, slices[0].Columns)
+        
+        # collect CT scan data as a pixel array, resize then store
+        for i in range(len(slices)):
+            imageSlice.append(rs_img(slices[i].pixel_array))
+        print("Resize x and y complete")
 
-    # Apply sampling technique
-    imageSlice = change_depth_siz(np.asanyarray(imageSlice))
-    processedCTScans.append(imageSlice)
-    # plt.imshow(imageSlice[0])
-    # plt.show()
-    imageSlice=None
-
-print((np.asanyarray(processedCTScans)).shape)
+        # Apply sampling technique
+        imageSlice = change_depth_siz(np.asanyarray(imageSlice))
+        processedCTScans.append(imageSlice)
+        # plt.imshow(imageSlice[0])
+        # plt.show()
+        imageSlice=None
+    print((np.asanyarray(processedCTScans)).shape)
  
+class cnnSimple(nn.Module):
+    def __init__(self):
+        super(cnnSimple, self).__init__()
+        
+        self.conv_layer1 = self._conv_layer_set(3, 32)
+        self.conv_layer2 = self._conv_layer_set(32, 64)
+        self.fc1 = nn.Linear(512, 128)
+        self.fc2 = nn.Linear(128, 2)
+        self.relu = nn.LeakyReLU()
+        self.batch=nn.BatchNorm1d(128)
+        self.drop=nn.Dropout(p=0.15)        
+        
+    def _conv_layer_set(self, in_c, out_c):
+        conv_layer = nn.Sequential(
+        nn.Conv3d(in_c, out_c, kernel_size=(3, 3, 3), padding=0),
+        nn.LeakyReLU(),
+        nn.MaxPool3d((2, 2, 2)),
+        )
+        return conv_layer
+    
+
+    def forward(self, x):
+        # Set 1
+        out = self.conv_layer1(x)
+        out = self.conv_layer2(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc1(out)
+        out = self.relu(out)
+        out = self.batch(out)
+        out = self.drop(out)
+        out = self.fc2(out)
+        return out
+
 class cnnNeuralNet(nn.Module):
     def __init__(self):
         super(cnnNeuralNet, self).__init__()
-        
+
         self.sequentialLayers = nn.Sequential(
         # Convolution and Pooling Layer 1
         nn.Conv3d(in_channels = 3, out_channels = 64,kernel_size = (3,3,3)),
@@ -168,253 +202,141 @@ class cnnNeuralNet(nn.Module):
         out = self.Model(x)
         return out
 
+loadProcessImage(chosenDf, yImages)
+
+def getDataList(sampleDf, imgList):
+    imgData = []
+    for i in range(len(sampleDf)):
+        imgData.append(imgList[sampleDf.iat[i, 3]])
+    return imgData
+def getTargets(sampleDf):
+    return sampleDf[1]
 
 batchSize = 64
 epochs = 60
 
-trainingDf, testingDf = torch.utils.data.random_split(chosenDf,[7,3],torch.Generator().manual_seed(42))
+xTrainingDf, xTestingDf, yTraining, yTesting  = train_test_split(chosenDf, getTargets(chosenDf), train_size = 0.7, test_size=0.3, random_state=42)
+print("Training Data", xTrainingDf)
+print("Testing Data", xTestingDf)
 
-trainLoader = torch.utils.data.DataLoader(trainingDf, batch_size = batchSize, drop_last=False, shuffle = False)
-testLoader = torch.utils.data.DataLoader(testingDf, batch_size = batchSize, drop_last=False, shuffle = False)
+train_x = (getDataList(xTrainingDf, yImages))
+train_y = (getTargets(yTraining))
+test_x = (getDataList(xTestingDf, yImages))
+test_y = (getTargets(yTesting))
+
+train = torch.utils.data.TensorDataset(train_x,train_y)
+test = torch.utils.data.TensorDataset(test_x,test_y)
+
+train_loader = torch.utils.data.DataLoader(train, batch_size = batchSize, drop_last=False, shuffle = False)
+test_loader = torch.utils.data.DataLoader(test, batch_size = batchSize, drop_last=False, shuffle = False)
 
 #-------------------------------------------------Training and Testing the model-------------------------------------------------#
 
 # Source code
 # https://blog.paperspace.com/fighting-coronavirus-with-ai-building-covid-19-classifier/
+# https://towardsdatascience.com/pytorch-step-by-step-implementation-3d-convolution-neural-network-8bf38c70e8b3
 
-def compute_metrics(model, test_loader, plot_roc_curve = False):
-    
-    model.eval()
-    
-    val_loss = 0
-    val_correct = 0
-    
-    criterion = nn.CrossEntropyLoss()
-    
-    score_list   = torch.Tensor([]).to(device)
-    pred_list    = torch.Tensor([]).to(device).long()
-    target_list  = torch.Tensor([]).to(device).long()
-    path_list    = []
-    
-    for index, i in test_loader.iterrows():
-        # Convert image data into single channel data
-        image, target = processedCTScans[i], i['label'].to(device)
 
-        # Compute the loss
-        with torch.no_grad():
-            output = model(image)
-        
-        # Log loss
-        val_loss += criterion(output, target.long()).item()
-        
-        # Calculate the number of correctly classified examples
-        pred = output.argmax(dim=1, keepdim=True)
-        val_correct += pred.eq(target.long().view_as(pred)).sum().item()
-        
-        # Bookkeeping 
-        score_list   = torch.cat([score_list, nn.Softmax(dim = 1)(output)[:,1].squeeze()])
-        pred_list    = torch.cat([pred_list, pred.squeeze()])
-        target_list  = torch.cat([target_list, target.squeeze()])
-        
-    classification_metrics = classification_report(target_list.tolist(), pred_list.tolist(), target_names = ['CT_NonCOVID', 'CT_COVID'],output_dict= True)
-    
-    # sensitivity is the recall of the positive class
-    sensitivity = classification_metrics['CT_COVID']['recall']
-    
-    # specificity is the recall of the negative class 
-    specificity = classification_metrics['CT_NonCOVID']['recall']
-    
-    # accuracy
-    accuracy = classification_metrics['accuracy']
-    
-    # confusion matrix
-    conf_matrix = confusion_matrix(target_list.tolist(), pred_list.tolist())
-    
-    # roc score
-    roc_score = roc_auc_score(target_list.tolist(), score_list.tolist())
-    
-    # plot the roc curve
-    if plot_roc_curve:
-        fpr, tpr, _ = roc_curve(target_list.tolist(), score_list.tolist())
-        plt.plot(fpr, tpr, label = "Area under ROC = {:.4f}".format(roc_score))
-        plt.legend(loc = 'best')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.show()
-        
-    
-    # put together values
-    metrics_dict = {"Accuracy": accuracy,
-                    "Sensitivity": sensitivity,
-                    "Specificity": specificity,
-                    "Roc_score"  : roc_score, 
-                    "Confusion Matrix": conf_matrix,
-                    "Validation Loss": val_loss / len(test_loader),
-                    "score_list":  score_list.tolist(),
-                    "pred_list": pred_list.tolist(),
-                    "target_list": target_list.tolist(),
-                    "paths": path_list}
-    
-    
-    return metrics_dict
+num_classes = 10
 
-class EarlyStopping(object):
-    def __init__(self, patience = 8):
-        super(EarlyStopping, self).__init__()
-        self.patience = patience
-        self.previous_loss = int(1e8)
-        self.previous_accuracy = 0
-        self.init = False
-        self.accuracy_decrease_iters = 0
-        self.loss_increase_iters = 0
-        self.best_running_accuracy = 0
-        self.best_running_loss = int(1e7)
+# Create CNN Model
+class CNNModel(nn.Module):
+    def __init__(self):
+        super(CNNModel, self).__init__()
+        
+        self.conv_layer1 = self._conv_layer_set(3, 32)
+        self.conv_layer2 = self._conv_layer_set(32, 64)
+        self.fc1 = nn.Linear(2**3*64, 128)
+        self.fc2 = nn.Linear(128, num_classes)
+        self.relu = nn.LeakyReLU()
+        self.batch=nn.BatchNorm1d(128)
+        self.drop=nn.Dropout(p=0.15)        
+        
+    def _conv_layer_set(self, in_c, out_c):
+        conv_layer = nn.Sequential(
+        nn.Conv3d(in_c, out_c, kernel_size=(3, 3, 3), padding=0),
+        nn.LeakyReLU(),
+        nn.MaxPool3d((2, 2, 2)),
+        )
+        return conv_layer
     
-    def add_data(self, model, loss, accuracy):
-        
-        # compute moving average
-        if not self.init:
-            running_loss = loss
-            running_accuracy = accuracy 
-            self.init = True
-        
-        else:
-            running_loss = 0.2 * loss + 0.8 * self.previous_loss
-            running_accuracy = 0.2 * accuracy + 0.8 * self.previous_accuracy
-        
-        # check if running accuracy has improved beyond the best running accuracy recorded so far
-        if running_accuracy < self.best_running_accuracy:
-            self.accuracy_decrease_iters += 1
-        else:
-            self.best_running_accuracy = running_accuracy
-            self.accuracy_decrease_iters = 0
-        
-        # check if the running loss has decreased from the best running loss recorded so far
-        if running_loss > self.best_running_loss:
-            self.loss_increase_iters += 1
-        else:
-            self.best_running_loss = running_loss
-            self.loss_increase_iters = 0
-        
-        # log the current accuracy and loss
-        self.previous_accuracy = running_accuracy
-        self.previous_loss = running_loss        
-        
-    
-    def stop(self):
-        
-        # compute thresholds
-        accuracy_threshold = self.accuracy_decrease_iters > self.patience
-        loss_threshold = self.loss_increase_iters > self.patience
-        
-        
-        # return codes corresponding to exhuaustion of patience for either accuracy or loss 
-        # or both of them
-        if accuracy_threshold and loss_threshold:
-            return 1
-        
-        if accuracy_threshold:
-            return 2
-        
-        if loss_threshold:
-            return 3
-        
-        
-        return 0
-    
-    def reset(self):
-        # reset
-        self.accuracy_decrease_iters = 0
-        self.loss_increase_iters = 0
-    
-early_stopper = EarlyStopping(patience = 5)
 
-model = cnnNeuralNet()
-learning_rate = 0.01
-momentumValue = 0.9
-optimizer = nn.Sigmoid(model.parameters(), lr = learning_rate, momentum=momentumValue)
-
-best_model = model
-best_val_score = 0
-
-criterion = nn.CrossEntropyLoss()
-
-for epoch in range(epochs):
-
-    model.train()    
-    train_loss = 0
-    train_correct = 0
-    
-    for iter_num, data in enumerate(trainLoader):
-        image, target = data['img'].to(device), data['label'].to(device)     
-
-        # Compute the loss
-        output = model(image)
-        loss = criterion(output, target.long()) / 8
+    def forward(self, x):
+        # Set 1
+        out = self.conv_layer1(x)
+        out = self.conv_layer2(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc1(out)
+        out = self.relu(out)
+        out = self.batch(out)
+        out = self.drop(out)
+        out = self.fc2(out)
         
-        # Log loss
-        train_loss += loss.item()
+        return out
+
+#Definition of hyperparameters
+n_iters = 4500
+num_epochs = n_iters / (len(train_x) / batchSize)
+num_epochs = int(num_epochs)
+
+# Create CNN
+model = CNNModel()
+#model.cuda()
+print(model)
+
+# Cross Entropy Loss 
+error = nn.CrossEntropyLoss()
+
+# SGD Optimizer
+learning_rate = 0.001
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+
+# CNN model training
+count = 0
+loss_list = []
+iteration_list = []
+accuracy_list = []
+for epoch in range(num_epochs):
+    for i, (images, labels) in enumerate(train_loader):
+        
+        train = Variable(images.view(100,3,16,16,16))
+        labels = Variable(labels)
+        # Clear gradients
+        optimizer.zero_grad()
+        # Forward propagation
+        outputs = model(train)
+        # Calculate softmax and ross entropy loss
+        loss = error(outputs, labels)
+        # Calculating gradients
         loss.backward()
-
-        # Perform gradient udpate
-        if iter_num % 8 == 0:
-            optimizer.step()
-            optimizer.zero_grad()
-            
-
-        # Calculate the number of correctly classified examples
-        pred = output.argmax(dim=1, keepdim=True)
-        train_correct += pred.eq(target.long().view_as(pred)).sum().item()
+        # Update parameters
+        optimizer.step()
         
-    
-    # Compute and print the performance metrics
-    metrics_dict = compute_metrics(model, trainLoader)
-    print('------------------ Epoch {} Iteration {}--------------------------------------'.format(epoch,iter_num))
-    print("Accuracy \t {:.3f}".format(metrics_dict['Accuracy']))
-    print("Sensitivity \t {:.3f}".format(metrics_dict['Sensitivity']))
-    print("Specificity \t {:.3f}".format(metrics_dict['Specificity']))
-    print("Area Under ROC \t {:.3f}".format(metrics_dict['Roc_score']))
-    print("Val Loss \t {}".format(metrics_dict["Validation Loss"]))
-    print("------------------------------------------------------------------------------")
-    
-    # Save the model with best validation accuracy
-    if metrics_dict['Accuracy'] > best_val_score:
-        torch.save(model, "/storage/best_model.pkl")
-        best_val_score = metrics_dict['Accuracy']
-    
-    
-    # print the metrics for training data for the epoch
-    print('\nTraining Performance Epoch {}: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        epoch, train_loss/len(trainLoader.dataset), train_correct, len(trainLoader.dataset),
-        100.0 * train_correct / len(trainLoader.dataset)))
-    
-    # log the accuracy and losses in tensorboard
-    # writer.add_scalars( "Losses", {'Train loss': train_loss / len(trainLoader), 'Validation_loss': metrics_dict["Validation Loss"]},epoch)
-    # writer.add_scalars( "Accuracies", {"Train Accuracy": 100.0 * train_correct / len(trainLoader.dataset),"Valid Accuracy": 100.0 * metrics_dict["Accuracy"]}, epoch)
+        count += 1
+        if count % 50 == 0:
+            # Calculate Accuracy         
+            correct = 0
+            total = 0
+            # Iterate through test dataset
+            for images, labels in test_loader:
+                
+                test = Variable(images.view(100,3,16,16,16))
+                # Forward propagation
+                outputs = model(test)
 
-    # Add data to the EarlyStopper object
-    early_stopper.add_data(model, metrics_dict['Validation Loss'], metrics_dict['Accuracy'])
-    
-    # If both accuracy and loss are not improving, stop the training
-    if early_stopper.stop() == 1:
-        break
-    
-    # if only loss is not improving, lower the learning rate
-    if early_stopper.stop() == 3:
-        for param_group in optimizer.param_groups:
-            learning_rate *= 0.1
-            param_group['lr'] = learning_rate
-            print('Updating the learning rate to {}'.format(learning_rate))
-            early_stopper.reset()
-
-
-model = torch.load("/storage/pretrained_covid_model.pkl" )
-
-metrics_dict = compute_metrics(model, testLoader, plot_roc_curve = True)
-print('------------------- Test Performance --------------------------------------')
-print("Accuracy \t {:.3f}".format(metrics_dict['Accuracy']))
-print("Sensitivity \t {:.3f}".format(metrics_dict['Sensitivity']))
-print("Specificity \t {:.3f}".format(metrics_dict['Specificity']))
-print("Area Under ROC \t {:.3f}".format(metrics_dict['Roc_score']))
-print("------------------------------------------------------------------------------")
-    
+                # Get predictions from the maximum value
+                predicted = torch.max(outputs.data, 1)[1]
+                
+                # Total number of labels
+                total += len(labels)
+                correct += (predicted == labels).sum()
+            
+            accuracy = 100 * correct / float(total)
+            
+            # store loss and iteration
+            loss_list.append(loss.data)
+            iteration_list.append(count)
+            accuracy_list.append(accuracy)
+        if count % 500 == 0:
+            # Print Loss
+            print('Iteration: {}  Loss: {}  Accuracy: {} %'.format(count, loss.data, accuracy))
