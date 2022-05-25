@@ -85,7 +85,7 @@ def change_depth_siz(img):
     depth = current_depth / desired_depth
     depth_factor = 1 / depth
     img_new = zoom(img, (depth_factor, 1, 1), mode='nearest')
-    print("New Depth", img_new.shape[0])
+    print("New Depth: ", img_new.shape[0])
     print(img_new.shape)
     return img_new
 
@@ -128,7 +128,7 @@ def loadProcessImage(dataset, processedCTScans):
         # plt.imshow(imageSlice[0])
         # plt.show()
         imageSlice=None
-    print(processedCTScans)
+    print(np.asanyarray(processedCTScans).shape)
  
 class cnnSimple(nn.Module):
     def __init__(self):
@@ -214,17 +214,25 @@ epochs = 60
 
 xTrainingDf, xTestingDf, yTraining, yTesting  = train_test_split(chosenDf["data"], chosenDf["label"], train_size = 0.6, test_size=0.4, random_state=42)
 # print("Training Data:\n", xTrainingDf)
-print("Testing Data:\n", xTestingDf)
-print("Y Train:\n", yTraining)
-print("Y Test:\n", yTesting)
+# print("Testing Data:\n", xTestingDf)
+# print("Y Train:\n", yTraining)
+# print("Y Test:\n", yTesting)
 
-# print("Shape", ((xTrainingDf.to_numpy())).shape())
+# print("Shape", xTrainingDf)
+# print("Shape", torch.stack(xTrainingDf,0).size())
+# print("Shape", xTrainingDf.shape)
+
+test = torch.stack(xTrainingDf.tolist())
+print("Shape", test)
+print("Shape", test.size())
+print("Shape", test.shape)
+
 print("Shape", yTraining)
 print(type(xTrainingDf))
 print(type(yTraining))
 
-train_x = (xTrainingDf)
-test_x = ((xTestingDf))
+train_x = torch.tensor(xTrainingDf.to_numpy())
+test_x = torch.tensor(xTestingDf.to_numpy())
 train_y = torch.as_tensor(yTraining.to_numpy())
 test_y = torch.as_tensor(yTesting.to_numpy())
 
