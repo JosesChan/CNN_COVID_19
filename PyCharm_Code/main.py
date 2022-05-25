@@ -222,17 +222,17 @@ xTrainingDf, xTestingDf, yTraining, yTesting  = train_test_split(chosenDf["data"
 # print("Shape", torch.stack(xTrainingDf,0).size())
 # print("Shape", xTrainingDf.shape)
 
-test = torch.stack(xTrainingDf.tolist())
-print("Shape", test)
-print("Shape", test.size())
-print("Shape", test.shape)
+# test = torch.stack(xTrainingDf.tolist())
+# print("Shape", test)
+# print("Shape", test.size())
+# print("Shape", test.shape)
 
 print("Shape", yTraining)
 print(type(xTrainingDf))
 print(type(yTraining))
 
-train_x = torch.tensor(xTrainingDf.to_numpy())
-test_x = torch.tensor(xTestingDf.to_numpy())
+train_x = torch.stack(xTrainingDf.tolist())
+test_x = torch.stack(xTestingDf.tolist())
 train_y = torch.as_tensor(yTraining.to_numpy())
 test_y = torch.as_tensor(yTesting.to_numpy())
 
