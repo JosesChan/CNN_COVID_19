@@ -6,7 +6,7 @@
 # Programmer involved : Fong Sun Joses Chan
 # Creation Date 23/11/2021
 # Information:
-# Uses CIFAR10 Dataset to prototype a 2D Convolutional Neural Network
+# Used CIFAR10 Dataset to prototype a 2D Convolutional Neural Network
 # Interesting notes:
 # How much CT scans are there of healthy patients without any diseases? Does this limit effectiveness?
 
@@ -215,11 +215,16 @@ loadProcessImage(chosenDf, yImages)
 batchSize = 64
 epochs = 60
 
-xTrainingDf, xTestingDf, yTraining, yTesting  = train_test_split(chosenDf["data"], chosenDf["label"], train_size = 0.6, test_size=0.4,random_state=42)
+xTrainingDf, xTesting, yTrainingDf, yTesting  = train_test_split(chosenDf["data"], chosenDf["label"], train_size = 0.6, test_size=0.4,random_state=42)
 
-train_x = torch.stack(xTrainingDf.tolist())
-test_x = torch.stack(xTestingDf.tolist())
+xTraining, xVal, yTraining, yVal  = train_test_split(xTrainingDf, yTrainingDf, train_size = 0.8, test_size=0.2,random_state=42)
+
+
+train_x = torch.stack(xTraining.tolist())
+val_x = torch.stack(xVal.tolist())
+test_x = torch.stack(xTesting.tolist())
 train_y = torch.as_tensor(yTraining.to_numpy())
+val_y = torch.as_tensor(yVal.to_numpy())
 test_y = torch.as_tensor(yTesting.to_numpy())
 
 print("Training Data:\n", train_x)
@@ -228,10 +233,16 @@ print("Y Train:\n", train_y)
 print("Y Test:\n", test_y)
 
 train = torch.utils.data.TensorDataset(train_x,train_y)
+validation = torch.utils.data.TensorDataset(val_x,val_y)
 test = torch.utils.data.TensorDataset(test_x, test_y)
 
 train_loader = torch.utils.data.DataLoader(train, batch_size = batchSize, drop_last=False, shuffle = False)
+validation_loader = torch.utils.data.DataLoader(train, batch_size = batchSize, drop_last=False, shuffle = False)
 test_loader = torch.utils.data.DataLoader(test, batch_size = batchSize, drop_last=False, shuffle = False)
+
+# calculate steps per epoch for training and validation set
+trainSteps = len(train_loader.dataset) // batchSize
+valSteps = len(validation_loader.dataset) // batchSize
 
 #-------------------------------------------------Training and Testing the model-------------------------------------------------#
 
@@ -267,135 +278,25 @@ class Network(nn.Module):
 
         return output
 
-# Instantiate a neural network model 
-model = Network()
- 
-# Define the loss function with Classification Cross-Entropy loss and an optimizer with Adam optimizer
-loss_fn = nn.CrossEntropyLoss()
-optimizer = Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
-
-# Function to save the model
-def saveModel():
-    path = "./myFirstModel.pth"
-    torch.save(model.state_dict(), path)
-
-# Function to test the model with the test dataset and print the accuracy for the test images
-def testAccuracy():
-    
-    model.eval()
-    accuracy = 0.0
-    total = 0.0
-    
-    with torch.no_grad():
-        for data in test_loader:
-            images, labels = data
-            # run the model on the test set to predict labels
-            outputs = model(images)
-            # the label with the highest energy will be our prediction
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            accuracy += (predicted == labels).sum().item()
-    
-    # compute the accuracy over all test images
-    accuracy = (100 * accuracy / total)
-    return(accuracy)
 
 
-# Training function. We simply have to loop over our data iterator and feed the inputs to the network and optimize.
-def train(num_epochs):
-    
-    best_accuracy = 0.0
-
-    # Define your execution device
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print("The model will be running on", device, "device")
-    # Convert model parameters and buffers to CPU or Cuda
-    model.to(device)
-
-    for epoch in range(num_epochs):  # loop over the dataset multiple times
-        running_loss = 0.0
-        running_acc = 0.0
-
-        for i, (images, labels) in enumerate(train_loader, 0):
-            
-            # get the inputs
-            images = Variable(images.to(device))
-            labels = Variable(labels.to(device))
-
-            # zero the parameter gradients
-            optimizer.zero_grad()
-            # predict classes using images from the training set
-            outputs = model(images)
-            # compute the loss based on model output and real labels
-            loss = loss_fn(outputs, labels)
-            # backpropagate the loss
-            loss.backward()
-            # adjust parameters based on the calculated gradients
-            optimizer.step()
-
-            # Let's print statistics for every 1,000 images
-            running_loss += loss.item()     # extract the loss value
-            if i % 1000 == 999:    
-                # print every 1000 (twice per epoch) 
-                print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 1000))
-                # zero the loss
-                running_loss = 0.0
-
-        # Compute and print the average accuracy fo this epoch when tested over all 10000 test images
-        accuracy = testAccuracy()
-        print('For epoch', epoch+1,'the test accuracy over the whole test set is %d %%' % (accuracy))
-        
-        # we want to save the model if the accuracy is the best
-        if accuracy > best_accuracy:
-            saveModel()
-            best_accuracy = accuracy
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-# Function to show the images
-def imageshow(img):
-    img = img / 2 + 0.5     # unnormalize
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
-    plt.show()
-
-
-# Function to test the model with a batch of images and show the labels predictions
-def testBatch():
-    # get batch of images from the test DataLoader  
-    images, labels = next(iter(test_loader))
-
-    # show all images as one image grid
-    imageshow(torchvision.utils.make_grid(images))
-   
-    # Show the real labels on the screen 
-    print('Real labels: ', ' '.join('%5s' % classes[labels[j]] 
-                               for j in range(batch_size)))
-  
-    # Let's see what if the model identifiers the  labels of those example
-    outputs = model(images)
-    
-    # We got the probability for every 10 labels. The highest (max) probability should be correct label
-    _, predicted = torch.max(outputs, 1)
-    
-    # Let's show the predicted labels on the screen to compare with the real ones
-    print('Predicted: ', ' '.join('%5s' % classes[predicted[j]] 
-                              for j in range(batch_size)))
-if __name__ == "__main__":
-    
-    # Let's build our model
-    train(5)
-    print('Finished Training')
-
-    # Test which classes performed well
-    testModelAccuracy()
-    
-    # Let's load the model we just created and test the accuracy per label
-    model = Network()
-    path = "myFirstModel.pth"
-    model.load_state_dict(torch.load(path))
-
-    # Test with batch of images
-    testBatch()
+class LeNet(Module):
+	def __init__(self, numChannels, classes):
+		# call the parent constructor
+		super(LeNet, self).__init__()
+		# initialize first set of CONV => RELU => POOL layers
+		self.conv1 = nn.Conv3d(in_channels=numChannels, out_channels=20,
+			kernel_size=(5, 5))
+		self.relu1 = ReLU()
+		self.maxpool1 = MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+		# initialize second set of CONV => RELU => POOL layers
+		self.conv2 = Conv2d(in_channels=20, out_channels=50,
+			kernel_size=(5, 5))
+		self.relu2 = ReLU()
+		self.maxpool2 = MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+		# initialize first (and only) set of FC => RELU layers
+		self.fc1 = Linear(in_features=800, out_features=500)
+		self.relu3 = ReLU()
+		# initialize our softmax classifier
+		self.fc2 = Linear(in_features=500, out_features=classes)
+		self.logSoftmax = LogSoftmax(dim=1)
