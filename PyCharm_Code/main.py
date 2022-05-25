@@ -57,13 +57,14 @@ covidNegativeDf = pandas.DataFrame(nonCovidPatients)
 covidNegativeDf.insert(1, "label", 0, True)
 print(covidNegativeDf.head())
 
-patientDf = pandas.concat([covidPositiveDf.head(5),covidNegativeDf.head(5)])
+patientDf = pandas.concat([covidPositiveDf.head(3),covidNegativeDf.head(3)])
 patientDf = patientDf.astype({'label':'int'})
-print(patientDf.head(10))
+print(patientDf.head(6))
 
-chosenDf = patientDf.head(10)
+chosenDf = patientDf.head(6)
 chosenDf.insert(2, "prediction", None, allow_duplicates=True)
 chosenDf.insert(3, "dataID", None, allow_duplicates=False)
+chosenDf.insert(4, "data", None, allow_duplicates=False)
 print("Total Patient Count")
 print(len(chosenDf))
 
@@ -113,17 +114,21 @@ def loadProcessImage(dataset, processedCTScans):
         print(len(slices), slices[0].Rows, slices[0].Columns)
         
         # collect CT scan data as a pixel array, resize then store
-        for i in range(len(slices)):
-            imageSlice.append(rs_img(slices[i].pixel_array))
+        for imageCount in range(len(slices)):
+            imageSlice.append(rs_img(slices[imageCount].pixel_array))
         print("Resize x and y complete")
 
         # Apply sampling technique
         imageSlice = change_depth_siz(np.asanyarray(imageSlice))
+        imageSlice = torch.tensor(imageSlice)
+        print(imageSlice.size())
         processedCTScans.append(imageSlice)
+        dataset.iat[i, 4] = imageSlice
+        dataset.iat[i, 3] = i
         # plt.imshow(imageSlice[0])
         # plt.show()
         imageSlice=None
-    print((np.asanyarray(processedCTScans)).shape)
+    print(processedCTScans)
  
 class cnnSimple(nn.Module):
     def __init__(self):
@@ -204,28 +209,32 @@ class cnnNeuralNet(nn.Module):
 
 loadProcessImage(chosenDf, yImages)
 
-def getDataList(sampleDf, imgList):
-    imgData = []
-    for i in range(len(sampleDf)):
-        imgData.append(imgList[sampleDf.iat[i, 3]])
-    return imgData
-def getTargets(sampleDf):
-    return sampleDf[1]
-
 batchSize = 64
 epochs = 60
 
-xTrainingDf, xTestingDf, yTraining, yTesting  = train_test_split(chosenDf, getTargets(chosenDf), train_size = 0.7, test_size=0.3, random_state=42)
-print("Training Data", xTrainingDf)
-print("Testing Data", xTestingDf)
+xTrainingDf, xTestingDf, yTraining, yTesting  = train_test_split(chosenDf["data"], chosenDf["label"], train_size = 0.6, test_size=0.4, random_state=42)
+# print("Training Data:\n", xTrainingDf)
+print("Testing Data:\n", xTestingDf)
+print("Y Train:\n", yTraining)
+print("Y Test:\n", yTesting)
 
-train_x = (getDataList(xTrainingDf, yImages))
-train_y = (getTargets(yTraining))
-test_x = (getDataList(xTestingDf, yImages))
-test_y = (getTargets(yTesting))
+# print("Shape", ((xTrainingDf.to_numpy())).shape())
+print("Shape", yTraining)
+print(type(xTrainingDf))
+print(type(yTraining))
+
+train_x = (xTrainingDf)
+test_x = ((xTestingDf))
+train_y = torch.as_tensor(yTraining.to_numpy())
+test_y = torch.as_tensor(yTesting.to_numpy())
+
+print("Training Data:\n", train_x)
+print("Testing Data:\n", test_x)
+print("Y Train:\n", train_y)
+print("Y Test:\n", test_y)
 
 train = torch.utils.data.TensorDataset(train_x,train_y)
-test = torch.utils.data.TensorDataset(test_x,test_y)
+test = torch.utils.data.TensorDataset(test_x, test_y)
 
 train_loader = torch.utils.data.DataLoader(train, batch_size = batchSize, drop_last=False, shuffle = False)
 test_loader = torch.utils.data.DataLoader(test, batch_size = batchSize, drop_last=False, shuffle = False)
