@@ -4,3 +4,8 @@
  Model based of one used to detect viral pneumonia.
  
  Requires installation of packages using Python 3.9 (preferably through Anaconda)
+ 
+ Steps to operate:
+ Open environment
+ Extract Covid Positive and Negative files within the same folder
+ Run
