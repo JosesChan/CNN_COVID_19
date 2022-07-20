@@ -5,6 +5,9 @@
  
  Requires installation of packages using Python 3.9 (preferably through Anaconda)
  
+ Due to the size of Computed Tomography scans, upload to Github is challenging and it is recommended to download either RICORD datasets
+ or use a custom dataset with DICOM file format.
+ 
  Steps to operate:
  Open environment
  Download Covid Positive and Negative files from RICORD 1A and RICORD 1B
