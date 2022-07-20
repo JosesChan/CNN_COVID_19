@@ -7,5 +7,9 @@
  
  Steps to operate:
  Open environment
- Extract Covid Positive and Negative files within the same folder
+ Download Covid Positive and Negative files from RICORD 1A and RICORD 1B
+ RICORD 1A: https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=80969742
+ RICORD 1B: https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=80969771
+ Extract Covid Positive and Negative files
+ Place in the respective folders
  Run
