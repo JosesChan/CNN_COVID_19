@@ -1,4 +1,4 @@
-# Sources used in development of this file:
+# Some sources used in development of this file:
 # https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
 # https://www.cs.toronto.edu/~kriz/cifar.html
 # https://stanfordmlgroup.github.io/competitions/mrnet/
@@ -6,7 +6,9 @@
 # Programmer involved : Fong Sun Joses Chan
 # Creation Date 23/11/2021
 # Information:
-# Used CIFAR10 Dataset to prototype a 2D Convolutional Neural Network
+# Uses RSNA International COVID-19 Open Radiology Database (RICORD) available through the links below:
+# Ricord 1a (Covid positive): https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=80969742
+# Ricord 1b (Covid negative): https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=80969771
 # Interesting notes:
 # How much CT scans are there of healthy patients without any diseases? Does this limit effectiveness?
 
