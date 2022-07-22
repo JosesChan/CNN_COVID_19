@@ -8,11 +8,11 @@
  Due to the size of Computed Tomography scans, upload to Github is challenging and it is recommended to download either RICORD datasets
  or use a custom dataset with DICOM file format.
  
- Steps to operate:
- Open environment
- Download Covid Positive and Negative files from RICORD 1A and RICORD 1B
- RICORD 1A: https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=80969742
- RICORD 1B: https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=80969771
- Extract Covid Positive and Negative files
- Place in the respective folders
+ Steps to operate:<br/>
+ Open environment<br/>
+ Download Covid Positive and Negative files from RICORD 1A and RICORD 1B<br/>
+ RICORD 1A: https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=80969742<br/>
+ RICORD 1B: https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=80969771<br/>
+ Extract Covid Positive and Negative files<br/>
+ Place in the respective folders<br/>
  Run
