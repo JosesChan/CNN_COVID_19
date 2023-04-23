@@ -70,6 +70,19 @@ chosenDf.insert(4, "data", None, allow_duplicates=False)
 print("Total Patient Count")
 print(len(chosenDf))
 
+
+def programController():
+	while(True):
+		print("Below are the following commands for this program")
+		print("Press 1, Train and load new model weights")
+		print("Press 2, Use saved weights")
+		print("Press 3, Save current model weights")
+		print("Press 4, Test the weights")
+		print("Press 5, Predict an image")
+		
+		userInput = input()
+		
+		
 	   
 # Source Code for resizer and SIZ
 # https://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynbhttps://github.com/hasibzunair/uniformizing-3D/blob/master/1_data_process_clef19.ipynb
